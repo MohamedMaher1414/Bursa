@@ -6,10 +6,11 @@ import json
 from datetime import datetime
 import requests
 import re
+import os
 
-# إعدادات Notion
-NOTION_TOKEN = "Bearer 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"
-DATABASE_ID = "1fe394ee85358074ad6aecfa014759a5"
+# إعدادات Notion من GitHub Secrets
+NOTION_TOKEN = "Bearer " + os.environ.get("NOTION_TOKEN")
+DATABASE_ID = os.environ.get("DATABASE_ID")
 
 HEADERS = {
     "Authorization": NOTION_TOKEN,
@@ -25,6 +26,7 @@ def fetch_prices():
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.binary_location = "/usr/bin/chromium-browser"  # GitHub Actions
 
     driver = webdriver.Chrome(options=options)
     driver.get(url)
@@ -74,7 +76,7 @@ def fetch_prices():
     if prices["white_meat_execution"] == 0 and prices["white_meat_market"] is not None:
         prices["white_meat_execution"] = prices["white_meat_market"] - 1
 
-    print("Extracted prices:", prices)
+    print("✅ Extracted prices:", prices)
     return prices
 
 def add_to_notion(prices):
@@ -92,7 +94,7 @@ def add_to_notion(prices):
     }
 
     res = requests.post("https://api.notion.com/v1/pages", headers=HEADERS, data=json.dumps(payload))
-    if res.status_code == 200:
+    if res.status_code == 200 or res.status_code == 201:
         print("✅ تم إضافة البيانات إلى نوتشن.")
     else:
         print("❌ خطأ أثناء الإرسال:", res.text)
