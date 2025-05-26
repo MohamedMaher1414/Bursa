@@ -2,7 +2,7 @@ name: Daily Notion Scraper
 
 on:
   schedule:
-    - cron: '56 10 * * *'
+    - cron: '15 11 * * *'
 
 
   workflow_dispatch:
