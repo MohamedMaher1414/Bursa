@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 import time
 import json
@@ -26,9 +27,10 @@ def fetch_prices():
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/usr/bin/chromium-browser"  # GitHub Actions
 
-    driver = webdriver.Chrome(options=options)
+    # استخدام المسار الصحيح لـ chromedriver المثبت عبر Snap
+    service = Service(executable_path="/snap/bin/chromium.chromedriver")
+    driver = webdriver.Chrome(service=service, options=options)
     driver.get(url)
     time.sleep(5)
 
