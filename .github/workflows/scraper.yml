@@ -2,7 +2,7 @@ name: Daily Notion Scraper
 
 on:
   schedule:
-    - cron: '43 7 * * *'
+    - cron: '30 8 * * *'
   workflow_dispatch:
 
 jobs:
@@ -27,8 +27,13 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y chromium-browser chromium-chromedriver
-          sudo ln -s /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver
+          if [ ! -f /usr/bin/chromedriver ]; then
+            sudo ln -s /snap/bin/chromium.chromedriver /usr/bin/chromedriver
+          fi
 
       - name: Run scraper
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          DATABASE_ID: ${{ secrets.DATABASE_ID }}
         run: |
           python main.py
