@@ -2,7 +2,7 @@ name: Daily Notion Scraper
 
 on:
   schedule:
-    - cron: '00 17 * * *'
+    - cron: '05 25 * * *'
 
 
 
