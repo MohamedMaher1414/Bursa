@@ -1,106 +1,137 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from bs4 import BeautifulSoup
-import time
-import json
-from datetime import datetime
-import requests
-import re
-import os
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import requests, time, datetime, os
 
-# إعدادات Notion من GitHub Secrets
-NOTION_TOKEN = "Bearer " + os.environ.get("NOTION_TOKEN")
-DATABASE_ID = os.environ.get("DATABASE_ID")
-
-HEADERS = {
-    "Authorization": NOTION_TOKEN,
-    "Content-Type": "application/json",
-    "Notion-Version": "2022-06-28",
-}
-
-def fetch_prices():
-    url = "https://www.elmorshdledwagn.com/prices/l2"
-
+def inspect_elmorshed():
     options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
+    # ✅ إعدادات متوافقة مع GitHub Actions (بيئة بدون واجهة رسومية)
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
 
-    # استخدام المسار الصحيح لـ chromedriver المثبت عبر Snap
-    service = Service(executable_path="/snap/bin/chromium.chromedriver")
-    driver = webdriver.Chrome(service=service, options=options)
-    driver.get(url)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get("https://www.elmorshdledwagn.com/prices/l2")
     time.sleep(5)
 
-    soup = BeautifulSoup(driver.page_source, "html.parser")
+    tables = driver.find_elements("tag name", "table")
+    all_data = []
+    for table in tables:
+        rows = table.find_elements("tag name", "tr")
+        for row in rows:
+            cols = [c.text.strip().replace("\n", "") for c in row.find_elements("tag name", "td")]
+            if cols:
+                all_data.append(cols)
     driver.quit()
 
-    prices = {
-        "white_meat_market": None,
-        "white_meat_execution": None,
-        "chick_high": None,
-        "chick_low": None,
+    print("\n📋 --- All Table Data ---\n")
+    for r in all_data:
+        print(r)
+
+    data = {
+        "white_meat_market": 0,
+        "white_meat_execution": 0,
+        "saso_meat_high": 0,
+        "saso_meat_low": 0,
+        "chick_high": 0,
+        "chick_low": 0,
+        "saso_pure_high": 0,
+        "saso_pure_low": 0,
+        "egg_white_high": 0,
+        "egg_white_low": 0,
+        "egg_red_high": 0,
+        "egg_red_low": 0
     }
 
-    table = soup.find("table")
-    if not table:
-        print("❌ لم يتم العثور على جدول الأسعار.")
-        return prices
-
-    rows = table.find_all("tr")[1:]
-
-    for row in rows:
-        cols = row.find_all("td")
-        if len(cols) != 4:
-            continue
-
-        item = cols[0].get_text(strip=True).replace(" ", "")
-        item = re.sub(r"[^؀-ۿ]+", "", item)
-
-        price1 = cols[1].get_text(strip=True).replace(",", "").replace("٫", ".")
-        price2 = cols[2].get_text(strip=True).replace(",", "").replace("٫", ".")
-
+    for row in all_data:
+        name = row[0].replace(" ", "").replace("(", "").replace(")", "").lower()
         try:
-            price1 = float(price1)
-            price2 = float(price2)
-        except ValueError:
+            if "اللحم" in name and "الابيض" in name:
+                data["white_meat_market"] = float(row[1].replace("00", "0") or 0)
+                data["white_meat_execution"] = float(row[2].replace("00", "0") or 0)
+            elif "الساسو" in name and "اللحم" in name:
+                data["saso_meat_high"] = float(row[1] or 0)
+                data["saso_meat_low"] = float(row[2] or 0)
+            elif "شركاتالكتاكيت" in name:
+                data["chick_high"] = float(row[1] or 0)
+                data["chick_low"] = float(row[2] or 0)
+            elif "كتكوتساسوبيور" in name:
+                data["saso_pure_high"] = float(row[1] or 0)
+                data["saso_pure_low"] = float(row[2] or 0)
+            elif "بيضابيض" in name:
+                data["egg_white_high"] = float(row[1] or 0)
+                data["egg_white_low"] = float(row[2] or 0)
+            elif "بيضاحمر" in name:
+                data["egg_red_high"] = float(row[1] or 0)
+                data["egg_red_low"] = float(row[2] or 0)
+        except:
             continue
 
-        if "اللحمالابيض" in item:
-            prices["white_meat_market"] = price1
-            prices["white_meat_execution"] = price2
-        elif "معلنشركاتالكتاكيت" in item:
-            prices["chick_high"] = price1
-            prices["chick_low"] = price2
+    # 🧠 منطق التعامل مع الأصفار
+    if data["white_meat_execution"] == 0:
+        data["white_meat_execution"] = data["white_meat_market"] - 1
+    if data["saso_meat_low"] == 0:
+        data["saso_meat_low"] = data["saso_meat_high"] - 1
+    if data["saso_pure_low"] == 0:
+        data["saso_pure_low"] = data["saso_pure_high"] - 1
+    if data["egg_white_low"] == 0:
+        data["egg_white_low"] = data["egg_white_high"] - 1
+    if data["egg_red_low"] == 0:
+        data["egg_red_low"] = data["egg_red_high"] - 1
 
-    if prices["white_meat_execution"] == 0 and prices["white_meat_market"] is not None:
-        prices["white_meat_execution"] = prices["white_meat_market"] - 1
+    print("\n✅ Extracted prices:", data)
+    return data
 
-    print("✅ Extracted prices:", prices)
-    return prices
 
-def add_to_notion(prices):
-    today = datetime.today().strftime("%Y-%m-%d")
-    payload = {
-        "parent": {"database_id": DATABASE_ID},
-        "properties": {
-            "Name": {"title": [{"text": {"content": f"بيانات يوم {today}"}}]},
-            "التاريخ": {"date": {"start": today}},
-            "سعر اللحم الأبيض - السوق": {"number": prices["white_meat_market"]},
-            "سعر اللحم الأبيض - التنفيذ": {"number": prices["white_meat_execution"]},
-            "سعر الكتكوت - أعلى": {"number": prices["chick_high"]},
-            "سعر الكتكوت - أقل": {"number": prices["chick_low"]},
-        },
+def send_to_notion(data):
+    # ✅ جلب القيم من Secrets (من GitHub Actions)
+    notion_token = os.getenv("NOTION_TOKEN")
+    database_id = os.getenv("NOTION_DB_ID")
+
+    if not notion_token or not database_id:
+        print("❌ Missing Notion credentials! تأكد إنك ضايف secrets في GitHub.")
+        return
+
+    today = datetime.date.today()
+    formatted_date = today.strftime("%Y-%m-%d")
+
+    url = "https://api.notion.com/v1/pages"
+    headers = {
+        "Authorization": f"Bearer {notion_token}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28"
     }
 
-    res = requests.post("https://api.notion.com/v1/pages", headers=HEADERS, data=json.dumps(payload))
-    if res.status_code == 200 or res.status_code == 201:
-        print("✅ تم إضافة البيانات إلى نوتشن.")
+    payload = {
+        "parent": {"database_id": database_id},
+        "properties": {
+            "Name": {"title": [{"text": {"content": f"بيانات المرشد {formatted_date}"}}]},
+            "التاريخ": {"date": {"start": formatted_date}},
+            "سعر اللحم الأبيض - السوق": {"number": data["white_meat_market"]},
+            "سعر اللحم الأبيض - التنفيذ": {"number": data["white_meat_execution"]},
+            "سعر اللحم الساسو - أعلى": {"number": data["saso_meat_high"]},
+            "سعر اللحم الساسو - أقل": {"number": data["saso_meat_low"]},
+            "سعر الكتكوت - أعلى": {"number": data["chick_high"]},
+            "سعر الكتكوت - أقل": {"number": data["chick_low"]},
+            "كتكوت ساسو بيور - أعلى": {"number": data["saso_pure_high"]},
+            "كتكوت ساسو بيور - أقل": {"number": data["saso_pure_low"]},
+            "بيض أبيض - أعلى": {"number": data["egg_white_high"]},
+            "بيض أبيض - أقل": {"number": data["egg_white_low"]},
+            "بيض أحمر - أعلى": {"number": data["egg_red_high"]},
+            "بيض أحمر - أقل": {"number": data["egg_red_low"]}
+        }
+    }
+
+    res = requests.post(url, headers=headers, json=payload)
+    if res.status_code == 200:
+        print("✅ تم الإرسال بنجاح إلى Notion.")
     else:
         print("❌ خطأ أثناء الإرسال:", res.text)
 
+
 if __name__ == "__main__":
-    prices = fetch_prices()
-    add_to_notion(prices)
+    data = inspect_elmorshed()
+    send_to_notion(data)
