@@ -2,12 +2,8 @@ name: Daily Notion Scraper
 
 on:
   schedule:
-    - cron: '00 17 * * *'
-
-
-
-
-  workflow_dispatch:
+    - cron: '00 17 * * *'  # تشغيل تلقائي كل يوم الساعة 5 مساء بتوقيت UTC (8 مساء بتوقيت مصر)
+  workflow_dispatch:        # لتشغيله يدويًا من GitHub Actions
 
 jobs:
   run-scraper:
@@ -25,7 +21,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # تثبيت المتطلبات من الملف لو موجود
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # تثبيت مكتبات أساسية في حال مش موجودة في requirements.txt
+          pip install selenium webdriver-manager
 
       - name: Install Chrome and chromedriver
         run: |
