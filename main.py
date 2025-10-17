@@ -1,21 +1,24 @@
+import os
+import time
+import datetime
+import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-import requests, time, datetime, os
+
 
 def inspect_elmorshed():
+    print("🚀 Starting scraping from elmorshdledwagn.com ...")
+
     options = Options()
-    # ✅ إعدادات متوافقة مع GitHub Actions (بيئة بدون واجهة رسومية)
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     driver.get("https://www.elmorshdledwagn.com/prices/l2")
-    time.sleep(5)
+    time.sleep(6)
 
     tables = driver.find_elements("tag name", "table")
     all_data = []
@@ -27,9 +30,7 @@ def inspect_elmorshed():
                 all_data.append(cols)
     driver.quit()
 
-    print("\n📋 --- All Table Data ---\n")
-    for r in all_data:
-        print(r)
+    print(f"\n📋 Extracted {len(all_data)} rows from tables")
 
     data = {
         "white_meat_market": 0,
@@ -70,7 +71,7 @@ def inspect_elmorshed():
         except:
             continue
 
-    # 🧠 منطق التعامل مع الأصفار
+    # إصلاح القيم الفارغة
     if data["white_meat_execution"] == 0:
         data["white_meat_execution"] = data["white_meat_market"] - 1
     if data["saso_meat_low"] == 0:
@@ -87,12 +88,13 @@ def inspect_elmorshed():
 
 
 def send_to_notion(data):
-    # ✅ جلب القيم من Secrets (من GitHub Actions)
     notion_token = os.getenv("NOTION_TOKEN")
-    database_id = os.getenv("NOTION_DB_ID")
+    database_id = os.getenv("NOTION_DB_ID") or os.getenv("DATABASE_ID")
 
     if not notion_token or not database_id:
-        print("❌ Missing Notion credentials! تأكد إنك ضايف secrets في GitHub.")
+        print("❌ Missing Notion credentials!")
+        print(f"NOTION_TOKEN present: {bool(notion_token)}")
+        print(f"DATABASE_ID present: {bool(database_id)}")
         return
 
     today = datetime.date.today()
@@ -125,11 +127,17 @@ def send_to_notion(data):
         }
     }
 
+    print("\n📤 Sending payload to Notion...")
+    print(payload)
+
     res = requests.post(url, headers=headers, json=payload)
-    if res.status_code == 200:
-        print("✅ تم الإرسال بنجاح إلى Notion.")
+    print(f"📄 Response code: {res.status_code}")
+    print("Response body:", res.text)
+
+    if res.status_code in [200, 201]:
+        print("✅ Data sent successfully to Notion.")
     else:
-        print("❌ خطأ أثناء الإرسال:", res.text)
+        print("❌ Failed to send to Notion.")
 
 
 if __name__ == "__main__":
